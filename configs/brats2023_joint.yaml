@@ -1,0 +1,20 @@
+# Stage 2 on BraTS 2023: all four objectives, LoRA language model.
+# accelerate launch --config_file configs/accelerate_zero2.yaml scripts/train.py \
+#     --config configs/brats2023_joint.yaml
+base: base.yaml
+experiment: brats2023_joint
+output_dir: runs/brats2023_joint
+train:
+  stage: joint
+  epochs: 50
+  batch_size: 8
+  init_from: runs/brats2023_vision/best.pt
+data:
+  type: brats
+  root: data/BraTS2023-GLI/ASNR-MICCAI-BraTS2023-GLI-Challenge-TrainingData
+  naming: "2023"
+  train_split: splits/brats2023_train.txt
+  val_split: splits/brats2023_report_test.txt # 150-report held-out subset
+  size: [128, 128, 128]
+  class_name: glioma
+  reports_jsonl: data/reports/brats2023_reports.jsonl   # {"case_id", "report", "notes"?}

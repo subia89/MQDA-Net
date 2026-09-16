@@ -1,0 +1,16 @@
+# Stage 1 on BraTS 2023 (GLI): segmentation + quantum classification.
+base: base.yaml
+experiment: brats2023_vision
+output_dir: runs/brats2023_vision
+train:
+  stage: vision
+  epochs: 300
+  batch_size: 4
+data:
+  type: brats
+  root: data/BraTS2023-GLI/ASNR-MICCAI-BraTS2023-GLI-Challenge-TrainingData
+  naming: "2023"
+  train_split: splits/brats2023_train.txt     # 1,001 cases
+  val_split: splits/brats2023_test.txt        # 250 cases
+  size: [128, 128, 128]
+  class_name: glioma

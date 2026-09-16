@@ -1,0 +1,47 @@
+# Tiny model on synthetic data - runs on a laptop CPU in about a minute.
+#   python scripts/train.py --config configs/smoke_test.yaml
+base: base.yaml
+experiment: smoke_test
+output_dir: runs/smoke_test
+model:
+  base_channels: 8
+  enc_blocks: [1, 1, 1, 1, 1]
+  enc_exp: [2, 2, 2, 2, 2]
+  dec_blocks: [1, 1, 1, 1]
+  dec_exp: [2, 2, 2, 2]
+  dfcam_dim: 32
+  dfcam_patch_sizes: [4, 8]
+  n_qubits: 8
+  n_pos_qubits: 2
+  q_hidden: [64]
+  q_diff_method: backprop
+  gat_dim: 32
+  qformer_layers: 1
+  qformer_hidden: 48
+  qformer_encoder_hidden: 48
+  n_vis_queries: 4
+  n_graph_queries: 2
+  n_quant_queries: 1
+  blip2_init: null
+  min_region_voxels: 1
+llm:
+  name_or_path: toy                    # offline random 2-layer Llama
+  lora_rank: 4
+  lora_alpha: 8
+  dtype: float32
+  gradient_checkpointing: false
+  max_prompt_tokens: 512
+  max_report_tokens: 160
+  align_dim: 16
+train:
+  stage: vision
+  epochs: 2
+  batch_size: 2
+  precision: fp32
+  num_workers: 0
+  log_every: 4
+data:
+  type: synthetic
+  size: [32, 32, 32]
+  n_train: 8
+  n_val: 4

@@ -1,0 +1,10 @@
+# 7K-DS (7,023 images: glioma / meningioma / pituitary / notumor, Training & Testing folders).
+base: figshare_br35h.yaml
+experiment: ds7k
+output_dir: runs/ds7k
+data:
+  type: folder
+  folder:
+    train_root: data/7K-DS/Training
+    val_root: data/7K-DS/Testing
+    class_map: {glioma: 0, meningioma: 1, pituitary: 2, notumor: 3}

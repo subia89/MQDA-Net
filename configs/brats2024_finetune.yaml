@@ -1,0 +1,18 @@
+# Fine-tune on BraTS 2024 post-treatment (217 / 54 split of Vox-MMSD).
+base: base.yaml
+experiment: brats2024_finetune
+output_dir: runs/brats2024_finetune
+train:
+  stage: vision
+  epochs: 300
+  batch_size: 4
+  init_from: runs/brats2023_vision/best.pt
+data:
+  type: brats
+  root: data/BraTS2024-GLI-PostTreatment/training_data
+  naming: "2023"          # file suffixes t1n / t1c / t2w / t2f
+  label_map: "2024"       # 1 NETC, 2 SNFH, 3 ET, 4 resection cavity -> background
+  train_split: splits/brats2024_train.txt
+  val_split: splits/brats2024_test.txt
+  size: [128, 128, 128]
+  class_name: glioma

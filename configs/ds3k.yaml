@@ -1,0 +1,10 @@
+# 3K-DS (3,264 images: glioma_tumor / meningioma_tumor / pituitary_tumor / no_tumor).
+base: figshare_br35h.yaml
+experiment: ds3k
+output_dir: runs/ds3k
+data:
+  type: folder
+  folder:
+    train_root: data/3K-DS/Training
+    val_root: data/3K-DS/Testing
+    class_map: {glioma_tumor: 0, meningioma_tumor: 1, pituitary_tumor: 2, no_tumor: 3}

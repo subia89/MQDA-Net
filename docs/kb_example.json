@@ -1,0 +1,10 @@
+{
+  "concepts": ["abnormal enhancement", "central necrosis", "perilesional edema", "mass effect",
+               "dural tail", "extra-axial location", "sellar location", "infiltrative margin",
+               "hemorrhage"],
+  "region_concepts": {
+    "ET": ["abnormal enhancement"],
+    "NCR": ["central necrosis", "hemorrhage"],
+    "ED": ["perilesional edema", "mass effect", "infiltrative margin"]
+  }
+}

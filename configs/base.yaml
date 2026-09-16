@@ -1,0 +1,93 @@
+# Paper configuration (Table 1). Other configs inherit from this file via `base:`.
+seed: 42
+
+model:
+  spatial_dims: 3
+  in_channels: 4                       # T1, T1-CE, T2, FLAIR
+  num_seg_classes: 4                   # background, NCR, ED, ET
+  class_names: [glioma, meningioma, pituitary, no tumor]
+  modality_names: "T1, T1-CE, T2, FLAIR"
+  voxel_volume_mm3: 1.0                # 1 mm isotropic
+  # MedNeXt-L style encoder with block-level MSASPP
+  base_channels: 32
+  enc_blocks: [3, 4, 8, 8, 2]
+  enc_exp: [3, 4, 8, 8, 8]
+  kernel_size: 3
+  aspp_rates: [1, 2, 4, 6]
+  # Dual-branch decoder + DFCAM at stages 3 and 4
+  dec_blocks: [8, 8, 4, 3]
+  dec_exp: [8, 8, 4, 3]
+  dfcam_stages: [3, 4]
+  dfcam_dim: 256
+  dfcam_patch_sizes: [8, 16]
+  dfcam_heads: 1
+  # Quantum head: 12 qubits, 2 PQC layers, 4 parallel kernels (72 circuit parameters)
+  n_qubits: 12
+  n_pos_qubits: 3
+  pqc_layers: 2
+  n_kernels: 4
+  q_hidden: [2048, 1920]
+  q_backend: torch                     # torch | pennylane (default.qubit)
+  q_diff_method: parameter-shift       # parameter-shift | backprop (identical gradients)
+  # Knowledge graph
+  use_graph: true
+  gat_dim: 256
+  gat_layers: 3
+  gat_heads: 4
+  kb_path: null                        # JSON overriding mqda/models/kb.py
+  atlas: {type: coarse}                # or {type: nifti, label_path: ..., lut_path: ...}
+  min_region_voxels: 10
+  graph_from_ground_truth: false
+  # Q-Former projector
+  qformer_layers: 4
+  qformer_hidden: 768
+  qformer_encoder_hidden: 1408
+  qformer_cross_freq: 1
+  n_vis_queries: 32
+  n_graph_queries: 8
+  n_quant_queries: 4
+  blip2_init: Salesforce/blip2-opt-2.7b   # set to null to skip BLIP-2 initialisation
+
+llm:
+  name_or_path: meta-llama/Llama-3.2-11B-Vision-Instruct
+  lora_rank: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  lora_target_modules: [q_proj, k_proj, v_proj, o_proj]
+  load_in_4bit: false                  # true = QLoRA
+  dtype: bfloat16
+  gradient_checkpointing: true
+  max_prompt_tokens: 384
+  max_report_tokens: 384
+  align_dim: 256
+  temperature: 0.07
+
+train:
+  stage: vision
+  epochs: 300
+  batch_size: 4
+  lr: 1.0e-4
+  llm_lr: 2.0e-5
+  weight_decay: 1.0e-5
+  lambdas: [1.0, 0.5, 1.0, 0.1]        # seg, cls, txt, align
+  w_binary: 0.8
+  w_semantic: 1.0
+  focal_gamma: 2.0
+  label_smoothing: 0.1
+  patience: 20
+  precision: bf16
+  grad_clip: 1.0
+  grad_accum: 1
+  scheduler: cosine
+  num_workers: 8
+
+data:
+  augment:
+    p_affine: 0.5
+    max_rotation: 15.0
+    scale: [0.85, 1.15]
+    p_elastic: 0.2
+    p_shift: 0.5
+    shift: 0.1
+    p_noise: 0.5
+    noise_std: 0.05

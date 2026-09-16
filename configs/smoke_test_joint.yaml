@@ -1,0 +1,9 @@
+# Joint stage of the smoke test (toy language model, synthetic reports).
+#   python scripts/train.py --config configs/smoke_test_joint.yaml
+base: smoke_test.yaml
+experiment: smoke_test_joint
+output_dir: runs/smoke_test_joint
+train:
+  stage: joint
+  epochs: 1
+  init_from: runs/smoke_test/best.pt
