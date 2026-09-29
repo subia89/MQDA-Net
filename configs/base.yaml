@@ -27,7 +27,8 @@ model:
   pqc_layers: 2
   n_kernels: 4
   q_hidden: [2048, 1920]
-  q_backend: torch                     # torch | pennylane (default.qubit)
+  q_backend: pennylane                 # PennyLane 0.35 default.qubit, per Table 1
+                                       # (`torch` selects the built-in simulator)
   q_diff_method: parameter-shift       # parameter-shift | backprop (identical gradients)
   # Knowledge graph
   use_graph: true
@@ -64,7 +65,7 @@ llm:
 
 train:
   stage: vision
-  epochs: 300
+  epochs: 200
   batch_size: 4
   lr: 1.0e-4
   llm_lr: 2.0e-5

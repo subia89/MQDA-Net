@@ -1,0 +1,12 @@
+# Nickparvar composite benchmark, version 1 (7,023 images: glioma 1,621 / meningioma 1,645 /
+# pituitary 1,757 / notumor 2,000). Version 2 of the Kaggle release is class-balanced at 7,200
+# images and is NOT the version the paper reports.
+base: figshare_br35h.yaml
+experiment: nickparvar
+output_dir: runs/nickparvar
+data:
+  type: folder
+  folder:
+    train_root: data/nickparvar/Training
+    val_root: data/nickparvar/Testing
+    class_map: {glioma: 0, meningioma: 1, pituitary: 2, notumor: 3}

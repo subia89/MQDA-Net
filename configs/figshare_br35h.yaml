@@ -10,7 +10,7 @@ model:
   dfcam_patch_sizes: [8, 16]
 train:
   stage: vision
-  epochs: 300
+  epochs: 200
   batch_size: 32
 data:
   type: figshare+folder

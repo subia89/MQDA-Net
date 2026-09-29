@@ -66,7 +66,8 @@ The smoke tests only confirm that every component runs end to end. They say noth
 | **BraTS 2024 post-treatment** (271 volumes) | fine-tuning / transfer | same naming; label 4 (resection cavity) is mapped to background |
 | **FigShare** (3,064 T1-CE slices) | classification + 2D masks | `data/figshare/*.mat` (the original `cjdata` files) |
 | **Br35H** (3,959 slices) | classification, merged with FigShare | `data/Br35H/{yes,no}/*.jpg` |
-| **3K-DS / 7K-DS** | classification | `data/<name>/{Training,Testing}/<class>/*.jpg` |
+| **Nickparvar composite** (7,023 images, v1) | classification, primary benchmark | `data/nickparvar/{Training,Testing}/<class>/*.jpg` |
+| **SARTAJ (3K-DS)** (3,264 images) | classification, supplementary | `data/3K-DS/{Training,Testing}/<class>/*.jpg` |
 
 BraTS 2021 naming (`t1, t1ce, t2, flair`, ET = 4) is also supported with `data.naming: "2021"`.
 
@@ -100,7 +101,7 @@ The lookup table has one `id name` pair per line. The default `{type: coarse}` a
 Training runs in two stages that share one model. Table 1 of the paper gives different epochs, learning rates and batch sizes for the segmentation/classification part and for the language part:
 
 ```bash
-# Stage 1 — encoder + dual-branch decoder + quantum head (L_seg + L_cls): 300 epochs, lr 1e-4, batch 4
+# Stage 1 — encoder + dual-branch decoder + quantum head (L_seg + L_cls): 200 epochs, lr 1e-4, batch 4
 python scripts/train.py --config configs/brats2023_vision.yaml
 
 # Stage 2 — all modules and all four losses: 50 epochs, lr 1e-4 (vision) / 2e-5 (LLM), batch 8,
@@ -113,7 +114,7 @@ python scripts/train.py --config configs/brats2024_finetune.yaml
 
 # 2D classification benchmarks (224 × 224, batch 32)
 python scripts/train.py --config configs/figshare_br35h.yaml
-python scripts/train.py --config configs/kaggle_7k.yaml
+python scripts/train.py --config configs/nickparvar.yaml
 python scripts/train.py --config configs/ds3k.yaml
 ```
 

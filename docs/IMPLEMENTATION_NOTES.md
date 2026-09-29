@@ -98,7 +98,7 @@ This file lists every place where the paper leaves a detail open and the code ha
 ## Training (§3.7, Table 1)
 
 - **Stages.** Table 1 gives separate epochs, learning rates and batch sizes for "seg + cls" and "LLM", so training runs in two stages with the same model code:
-  1. `stage: vision` — L_seg + L_cls, 300 epochs, lr 1e-4, batch 4 (3D) / 32 (2D).
+  1. `stage: vision` — L_seg + L_cls, 200 epochs, lr 1e-4, batch 4 (3D) / 32 (2D).
   2. `stage: joint` — all four losses, 50 epochs, batch 8, lr 1e-4 for vision / graph / Q-Former and 2e-5 for LoRA and the alignment heads. Everything is trained end to end in this stage.
 - **Optimiser.** AdamW with weight decay 1e-5, gradient clipping at 1.0 and bf16. The cosine learning-rate schedule is not stated in the paper and can be turned off with `train.scheduler: none`.
 - **Early stopping.** Patience is 20 epochs. By default the monitored value is mean Dice + accuracy − 0.1·val L_txt.
@@ -109,5 +109,5 @@ This file lists every place where the paper leaves a detail open and the code ha
 ## Not included
 
 - Trained weights, and the 150 clinician-annotated reports or the 50 curated DPO pairs used in the paper.
-- The 3K-DS / 7K-DS source links (the paper leaves them as "[source]") and the exact Vox-MMSD BraTS 2024 split list. Place them under `splits/` if you have them.
+- The exact Vox-MMSD BraTS 2024 split list. Place it under `splits/` if you have it.
 - A skull-stripping tool. BraTS is already skull-stripped; for other data use e.g. HD-BET before `scripts/preprocess.py`.

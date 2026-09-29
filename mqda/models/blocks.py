@@ -2,7 +2,7 @@
 
 Every module in MQDA-Net takes a ``spatial_dims`` argument (2 or 3) so the
 same code serves the volumetric BraTS setting (4 x 128^3) and the
-two-dimensional slice datasets (FigShare, Br35H, 3K-DS, 7K-DS at 224^2).
+two-dimensional slice datasets (FigShare, Br35H, SARTAJ (3K-DS) and the Nickparvar composite at 224^2).
 """
 from __future__ import annotations
 

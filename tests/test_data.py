@@ -91,7 +91,7 @@ def test_augment_and_crop_keep_shapes():
 
 def test_config_inheritance():
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    cfg = load_config(os.path.join(root, "configs", "kaggle_7k.yaml"), ["train.epochs=3"])
+    cfg = load_config(os.path.join(root, "configs", "nickparvar.yaml"), ["train.epochs=3"])
     assert cfg["model"]["spatial_dims"] == 2          # from figshare_br35h.yaml
     assert cfg["model"]["n_qubits"] == 12             # from base.yaml
     assert cfg["data"]["type"] == "folder" and cfg["train"]["epochs"] == 3
