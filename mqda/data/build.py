@@ -4,7 +4,8 @@ from __future__ import annotations
 import torch
 from torch.utils.data import ConcatDataset, Dataset, Subset
 
-from .datasets import BraTSDataset, FigShareDataset, FolderDataset, random_split_indices
+from .datasets import (BraTSDataset, FigShareDataset, FolderDataset, random_split_indices,
+                       read_split)
 
 
 class SyntheticDataset(Dataset):
@@ -86,10 +87,16 @@ def build_datasets(data_cfg: dict, model_cfg):
                 parts_val.append(Subset(full_va, va))
         if t in ("folder", "figshare+folder"):
             fo = data_cfg["folder"]
-            mk = lambda root, train: FolderDataset(  # noqa: E731
+            mk = lambda root, train, files=None: FolderDataset(  # noqa: E731
                 root, fo["class_map"], size=size, train=train, augment=aug,
-                mask_root=fo.get("mask_root"), mask_label=fo.get("mask_label", 1))
-            if fo.get("train_root"):
+                mask_root=fo.get("mask_root"), mask_label=fo.get("mask_label", 1), files=files)
+            if fo.get("train_split"):
+                # explicit file lists, e.g. the 5,618 / 1,405 stratified split of the
+                # Nickparvar composite reported in the manuscript
+                root = fo.get("root") or fo.get("train_root")
+                parts_train.append(mk(root, True, read_split(fo["train_split"])))
+                parts_val.append(mk(root, False, read_split(fo["val_split"])))
+            elif fo.get("train_root"):
                 parts_train.append(mk(fo["train_root"], True))
                 parts_val.append(mk(fo["val_root"], False))
             else:

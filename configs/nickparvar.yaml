@@ -7,6 +7,15 @@ output_dir: runs/nickparvar
 data:
   type: folder
   folder:
-    train_root: data/nickparvar/Training
-    val_root: data/nickparvar/Testing
     class_map: {glioma: 0, meningioma: 1, pituitary: 2, notumor: 3}
+    # The manuscript reports an image-level stratified 80/20 split of all 7,023
+    # images (5,618 / 1,405). Generate the lists once with
+    #   python scripts/make_splits.py --stratified-folder data/nickparvar \
+    #       --test-fraction 0.2 --prefix splits/nickparvar
+    root: data/nickparvar
+    train_split: splits/nickparvar_train.txt
+    val_split: splits/nickparvar_test.txt
+    # The dataset's own Training / Testing folders (5,712 / 1,311) are a different
+    # split; to use them instead, drop the three lines above and set:
+    #   train_root: data/nickparvar/Training
+    #   val_root: data/nickparvar/Testing

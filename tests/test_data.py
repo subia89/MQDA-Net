@@ -95,3 +95,25 @@ def test_config_inheritance():
     assert cfg["model"]["spatial_dims"] == 2          # from figshare_br35h.yaml
     assert cfg["model"]["n_qubits"] == 12             # from base.yaml
     assert cfg["data"]["type"] == "folder" and cfg["train"]["epochs"] == 3
+
+
+def test_folder_split_files_select_the_listed_images(tmp_path):
+    Image = pytest.importorskip("PIL.Image")
+
+    from mqda.data.build import build_datasets
+    from mqda.models.mqda_net import ModelConfig
+
+    for cls in ("glioma", "notumor"):
+        os.makedirs(tmp_path / "Training" / cls)
+        for i in range(4):
+            Image.fromarray((np.random.rand(20, 20) * 255).astype("uint8")).save(
+                tmp_path / "Training" / cls / f"{i}.png")
+    train_list, test_list = tmp_path / "tr.txt", tmp_path / "te.txt"
+    train_list.write_text("Training/glioma/0.png\nTraining/notumor/0.png\n")
+    test_list.write_text("Training/glioma/1.png\n")
+    cfg = {"type": "folder", "size": [16, 16],
+           "folder": {"class_map": {"glioma": 0, "notumor": 3}, "root": str(tmp_path),
+                      "train_split": str(train_list), "val_split": str(test_list)}}
+    tr, va = build_datasets(cfg, ModelConfig(spatial_dims=2, in_channels=1))
+    assert len(tr) == 2 and len(va) == 1
+    assert sorted(tr[i]["cls"] for i in range(len(tr))) == [0, 3]

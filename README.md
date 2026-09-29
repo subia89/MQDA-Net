@@ -206,10 +206,36 @@ mqda/eval/          metrics and statistical tests
 mqda/utils/         config loading, checkpoints, sliding-window inference
 mqda/engine.py      training / validation loop
 scripts/            train, evaluate, generate_reports, infer, dpo_refine, significance,
-                    count_params, preprocess, make_splits
+                    count_params, preprocess, make_splits, overlap_analysis
+splits/             train / test file lists (generated with scripts/make_splits.py)
 tests/              pytest suite (synthetic data, offline toy language model)
 docs/               implementation notes, example knowledge-base file, figures
+RELEASE_NOTES.md    what each tagged release corresponds to in the manuscript
 ```
+
+## Reproducibility
+
+- **Seeds.** Every config sets `seed: 42`, applied to Python, NumPy and PyTorch through Accelerate. Dataset splits are drawn with their own seed (`data.seed`), so they are reproducible independently of training.
+- **Splits.** Generate them once, then commit the lists:
+
+```bash
+# BraTS 2023: 1,001 / 250, and the 150-report evaluation subset
+python scripts/make_splits.py --root <BraTS2023-GLI dir> --n-test 250 --prefix splits/brats2023
+python scripts/make_splits.py --ids splits/brats2023_test.txt --n-test 150 \
+    --prefix splits/brats2023_report --only-test
+
+# Nickparvar composite: the image-level stratified 80/20 split (5,618 / 1,405)
+python scripts/make_splits.py --stratified-folder data/nickparvar \
+    --test-fraction 0.2 --prefix splits/nickparvar
+```
+
+- **Duplicate and overlap analysis.** The numbers in the manuscript's Table 3b come from:
+
+```bash
+python scripts/overlap_analysis.py --root data/nickparvar
+```
+
+- **Trained weights**, the 150 clinician-annotated reports and the 50 curated DPO preference pairs are not distributed here; they are available from the corresponding author on reasonable request.
 
 ## Hardware
 
@@ -220,4 +246,4 @@ The paper's experiments ran on 2 × NVIDIA H100 80 GB GPUs with PyTorch 2.1, bf1
 
 ## Citation
 
-If you use this code, please cite the MQDA-Net paper. The BibTeX entry will be added once the paper is published.
+This repository accompanies the MQDA-Net manuscript (IJIES, paper ID 20265965). Cite the release tag, or its commit hash, when reproducing the reported experiments; the full BibTeX entry will be added on publication.
