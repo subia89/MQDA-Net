@@ -2,13 +2,19 @@
 
 **A Quantum-Enhanced Dual-Branch Framework for Unified Brain Tumor Segmentation, Classification and Structured Radiology Report Generation**
 
-MQDA-Net trains three tasks together, in one training graph, from multi-parametric brain MRI (T1, T1-CE, T2, FLAIR):
+MQDA-Net places three tasks in one architecture over a shared encoder, from multi-parametric brain MRI (T1, T1-CE, T2, FLAIR):
 
 1. **Volumetric segmentation** of enhancing tumor, tumor core and whole tumor.
 2. **Tumor-type classification** into glioma, meningioma, pituitary tumor or no tumor.
 3. **Structured radiology reports** with volumes, laterality and lobe, impression and a BT-RADS score.
 
+The segmentation mask conditions the knowledge graph, and the graph embedding and quantum measurement vector condition report generation. Each pathway is optimized on the cohort that carries its annotations (Figure 1, bottom).
+
 ![MQDA-Net architecture](docs/figures/architecture.jpg)
+
+*Figure 1 — the six stages: input and preprocessing (with the deterministic 2D→3D adaptation of the classification cohort), the 3D multi-scale encoder with block-level MSASPP, the dual-branch decoder with DFCAM, the quantum classification head, the dynamic knowledge graph, and the Q-Former-conditioned LoRA report generator.*
+
+More module figures: [dual-branch decoder](docs/figures/dual_branch_decoder.jpg) · [quantum head and knowledge graph](docs/figures/quantum_head_and_graph.jpg) · [report generation](docs/figures/report_generation.jpg)
 
 | Module | Paper | Code |
 |---|---|---|
