@@ -27,8 +27,23 @@ DEFAULT_TRAIN = {
     "precision": "bf16", "grad_clip": 1.0, "grad_accum": 1, "scheduler": "cosine",
     "warmup_epochs": 0, "num_workers": 4, "init_from": None, "resume": None,
     "val_every": 1, "max_val_batches": None, "monitor": "auto", "log_every": 20,
-    "seed": 42,
+    "seed": 42, "batch_size_2d": 32, "freeze_vision": False,
 }
+
+
+def freeze_vision_modules(model):
+    """Report stage of Table 2: the shared encoder, MSASPP, DFCAM, the decoder
+    and the quantum head are evaluated but not updated; only the graph
+    reasoner, the Q-Former projector and the LoRA adapters are trained."""
+    frozen = 0
+    for mod in (model.encoder, model.decoder, model.quantum_head):
+        for p in mod.parameters():
+            p.requires_grad_(False)
+            frozen += p.numel()
+    model.encoder.eval()
+    model.decoder.eval()
+    log.info("froze %.2f M vision parameters for the report stage", frozen / 1e6)
+    return frozen
 
 
 def make_optimizer(model, tcfg):
@@ -111,6 +126,11 @@ def train(cfg: dict, model, accelerator):
     with_report = model.report is not None
     class_names = model.cfg.class_names
 
+    if tcfg["freeze_vision"]:
+        freeze_vision_modules(model)
+    if cfg["data"].get("type") == "alternating":
+        return train_alternating(cfg, tcfg, model, accelerator)
+
     train_ds, val_ds = build_datasets(cfg["data"], model.cfg)
     log.info("train %d / val %d samples", len(train_ds), len(val_ds))
     train_dl = DataLoader(train_ds, batch_size=tcfg["batch_size"], shuffle=True,
@@ -182,6 +202,141 @@ def train(cfg: dict, model, accelerator):
                         core.report.llm.save_pretrained(os.path.join(out_dir, "lora_adapter"))
             else:
                 bad_epochs += 1
+        if accelerator.is_main_process:
+            log.info(json.dumps({k: (round(v, 5) if isinstance(v, float) else v)
+                                 for k, v in record.items()}))
+            with open(history_path, "a") as f:
+                f.write(json.dumps(record) + "\n")
+        if bad_epochs >= tcfg["patience"]:
+            log.info("early stopping after %d epochs without improvement", bad_epochs)
+            break
+    return best
+
+
+# --------------------------------------------------------------------------
+# Stage 1 with two cohorts (paper Sec. 3.7, Table 2 and Algorithm 1)
+# --------------------------------------------------------------------------
+
+@torch.no_grad()
+def validate_alternating(model, seg_dl, cls_dl, criterion, accelerator, class_names,
+                         max_batches=None, distances=False):
+    model.eval()
+    metrics, seg_scores, losses = {}, [], defaultdict(list)
+    for i, batch in enumerate(seg_dl):
+        if max_batches and i >= max_batches:
+            break
+        with accelerator.autocast():
+            out = model(batch["image"], task="seg")
+            _, logs = criterion(out, batch["seg"], None, batch["has_mask"])
+        for k, v in logs.items():
+            losses[k].append(float(v))
+        pred = out["semantic_logits"].argmax(1).cpu().numpy()
+        gt = batch["seg"].cpu().numpy()
+        for j in range(len(pred)):
+            if bool(batch["has_mask"][j]):
+                seg_scores.append(segmentation_metrics(pred[j], gt[j], distances=distances))
+    y_true, y_pred = [], []
+    for i, batch in enumerate(cls_dl):
+        if max_batches and i >= max_batches:
+            break
+        with accelerator.autocast():
+            out = model(batch["image"], task="cls")
+            _, logs = criterion(out, None, batch["cls"])
+        for k, v in logs.items():
+            losses[k].append(float(v))
+        y_true += batch["cls"].tolist()
+        y_pred += out["cls_logits"].argmax(-1).tolist()
+    metrics.update({f"val_{k}": float(np.mean(v)) for k, v in losses.items()})
+    if seg_scores:
+        for k in seg_scores[0]:
+            metrics[k] = float(np.mean([s[k] for s in seg_scores]))
+    if any(t >= 0 for t in y_true):
+        cm = classification_metrics(y_true, y_pred, class_names)
+        metrics.update({k: v for k, v in cm.items() if k != "confusion_matrix"})
+    model.train()
+    return metrics
+
+
+def train_alternating(cfg, tcfg, model, accelerator):
+    """One epoch presents both cohorts in alternating task-specific steps: a
+    segmentation step (3D BraTS batch, L_seg, no quantum head) and a
+    classification step (2D batch through A_2D->3D, L_cls, no decoder). Both
+    update the shared encoder and MSASPP."""
+    out_dir = cfg.get("output_dir", "runs/mqda")
+    class_names = model.cfg.class_names
+    data = cfg["data"]
+    seg_tr, seg_va = build_datasets({**data["segmentation"], "augment": data.get("augment", {})},
+                                    model.cfg)
+    cls_tr, cls_va = build_datasets({**data["classification"], "augment": data.get("augment", {})},
+                                    model.cfg)
+    log.info("segmentation %d/%d, classification %d/%d samples",
+             len(seg_tr), len(seg_va), len(cls_tr), len(cls_va))
+    mk = lambda ds, bs, sh: DataLoader(  # noqa: E731
+        ds, batch_size=bs, shuffle=sh, num_workers=tcfg["num_workers"], collate_fn=collate,
+        drop_last=sh and len(ds) > bs, pin_memory=torch.cuda.is_available())
+    seg_dl, cls_dl = mk(seg_tr, tcfg["batch_size"], True), mk(cls_tr, tcfg["batch_size_2d"], True)
+    seg_vl, cls_vl = mk(seg_va, tcfg["batch_size"], False), mk(cls_va, tcfg["batch_size_2d"], False)
+
+    if tcfg["init_from"]:
+        load_checkpoint(tcfg["init_from"], model)
+    criterion = MQDALoss(tuple(tcfg["lambdas"]), tcfg["w_binary"], tcfg["w_semantic"],
+                         tcfg["focal_gamma"], tcfg["label_smoothing"])
+    opt = make_optimizer(model, tcfg)
+    steps_per_epoch = max(len(seg_dl) + len(cls_dl), 1)
+    sched = make_scheduler(opt, tcfg, steps_per_epoch)
+    model, opt, seg_dl, cls_dl, seg_vl, cls_vl, sched = accelerator.prepare(
+        model, opt, seg_dl, cls_dl, seg_vl, cls_vl, sched)
+
+    best, bad_epochs, step = -float("inf"), 0, 0
+    history_path = os.path.join(out_dir, "history.jsonl")
+    for epoch in range(tcfg["epochs"]):
+        model.train()
+        t0 = time.time()
+        running, counts = defaultdict(float), defaultdict(int)
+        seg_it, cls_it = iter(seg_dl), iter(cls_dl)
+        n_seg, n_cls = len(seg_dl), len(cls_dl)
+        # interleave the two step types across the epoch
+        plan = []
+        for i in range(max(n_seg, n_cls)):
+            if i < n_seg:
+                plan.append("seg")
+            if i < n_cls:
+                plan.append("cls")
+        for task in plan:
+            batch = next(seg_it) if task == "seg" else next(cls_it)
+            with accelerator.autocast():
+                out = model(batch["image"], task=task)
+                if task == "seg":
+                    loss, logs = criterion(out, batch["seg"], None, batch["has_mask"])
+                else:
+                    loss, logs = criterion(out, None, batch["cls"])
+            accelerator.backward(loss)
+            if tcfg["grad_clip"]:
+                accelerator.clip_grad_norm_(model.parameters(), tcfg["grad_clip"])
+            opt.step()
+            sched.step()
+            opt.zero_grad(set_to_none=True)
+            for k, v in logs.items():
+                running[f"{task}_{k}"] += float(v)
+            counts[task] += 1
+            step += 1
+            if step % tcfg["log_every"] == 0:
+                log.info("epoch %d step %d (%s) loss %.4f", epoch, step, task, float(logs["loss"]))
+        record = {"epoch": epoch, "time_s": round(time.time() - t0, 1),
+                  "seg_steps": counts["seg"], "cls_steps": counts["cls"],
+                  **{f"train_{k}": v / max(counts[k.split('_')[0]], 1) for k, v in running.items()}}
+        if (epoch + 1) % tcfg["val_every"] == 0:
+            record.update(validate_alternating(model, seg_vl, cls_vl, criterion, accelerator,
+                                               class_names, tcfg["max_val_batches"]))
+            score = monitor_value(record, tcfg["monitor"])
+            record["monitor"] = score
+            core = accelerator.unwrap_model(model)
+            if accelerator.is_main_process:
+                save_checkpoint(os.path.join(out_dir, "last.pt"), core, opt, epoch, record, cfg)
+                if score > best:
+                    save_checkpoint(os.path.join(out_dir, "best.pt"), core, None, epoch, record, cfg)
+            bad_epochs = 0 if score > best else bad_epochs + 1
+            best = max(best, score)
         if accelerator.is_main_process:
             log.info(json.dumps({k: (round(v, 5) if isinstance(v, float) else v)
                                  for k, v in record.items()}))

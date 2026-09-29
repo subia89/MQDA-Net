@@ -1,0 +1,13 @@
+# Smoke test of the alternating stage-1 loop on synthetic data.
+#   python scripts/train.py --config configs/smoke_test_alternating.yaml
+base: smoke_test.yaml
+experiment: smoke_test_alternating
+output_dir: runs/smoke_test_alternating
+train:
+  epochs: 1
+  batch_size: 2
+  batch_size_2d: 2
+data:
+  type: alternating
+  segmentation: {type: synthetic, size: [32, 32, 32], n_train: 4, n_val: 2}
+  classification: {type: synthetic, spatial_dims: 2, in_channels: 1, size: [32, 32], n_train: 4, n_val: 2}

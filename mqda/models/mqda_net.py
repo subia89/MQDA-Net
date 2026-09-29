@@ -10,6 +10,7 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
+from ..data.adapt import adapt_2d_to_3d
 from ..data.atlas import build_atlas
 from .decoder import DualBranchDecoder
 from .encoder import MQDAEncoder
@@ -28,6 +29,9 @@ class ModelConfig:
     class_names: list = field(default_factory=lambda: ["glioma", "meningioma", "pituitary", "no tumor"])
     modality_names: str = "T1, T1-CE, T2, FLAIR"
     voxel_volume_mm3: float = 1.0
+    # deterministic 2D -> 3D adaptation of the classification cohort
+    adapt_size: int = 128
+    adapt_depth: int = 16
     # encoder (MedNeXt-L style, block counts shortened at the bottleneck)
     base_channels: int = 32
     enc_blocks: list = field(default_factory=lambda: [3, 4, 8, 8, 2])
@@ -126,7 +130,28 @@ class MQDANet(nn.Module):
         return (p for p in self.report.parameters() if p.requires_grad)
 
     # ------------------------------------------------------------------
-    def segment_and_classify(self, images):
+    def classify_2d(self, images_2d):
+        """Classification step of Table 2: the 2D cohort reaches the shared 3D
+        encoder through A_2D->3D, is pooled by global average pooling (no mask,
+        so no masked pooling and no radiomics) and goes through the same
+        projection and quantum register as the volumetric path (Sec. 3.4).
+        The decoder and DFCAM are not in the path."""
+        volumes = adapt_2d_to_3d(images_2d, size=self.cfg.adapt_size,
+                                 depth=self.cfg.adapt_depth, channels=self.cfg.in_channels)
+        feats = self.encoder(volumes)
+        f5 = feats[-1]
+        gap = f5.flatten(2).mean(-1)                                  # (N, C5)
+        n_reg = len(REGION_NAMES)
+        # same dimension as the volumetric f_cls: the pooled vector fills the
+        # sub-region slots, the radiomic block is zero (no mask for this cohort)
+        f_cls = torch.cat([gap.repeat(1, n_reg),
+                           gap.new_zeros(gap.shape[0], n_reg * self.rad_dim)], -1)
+        coords = gap.new_zeros(gap.shape[0], 3)
+        logits, z = self.quantum_head(f_cls.float(), coords)
+        return {"features": feats, "f5": f5, "cls_logits": logits, "z": z,
+                "coords": coords, "volumes": volumes}
+
+    def segment_and_classify(self, images, with_classifier: bool = True):
         feats = self.encoder(images)
         dec = self.decoder(feats)
         f5 = feats[-1]
@@ -136,11 +161,14 @@ class MQDANet(nn.Module):
         f_cls = torch.cat([pooled.flatten(1), rad.flatten(1)], -1)
         tumor = masks.sum(1, keepdim=True)
         coords = tumor_centroid(tumor.float())
-        logits, z = self.quantum_head(f_cls.float(), coords)
-        return {"features": feats, "f5": f5, "binary_logits": dec["binary_logits"],
-                "semantic_logits": dec["semantic_logits"], "region_masks": masks,
-                "pooled": pooled, "radiomics": rad, "cls_logits": logits, "z": z,
-                "coords": coords}
+        out = {"features": feats, "f5": f5, "binary_logits": dec["binary_logits"],
+               "semantic_logits": dec["semantic_logits"], "region_masks": masks,
+               "pooled": pooled, "radiomics": rad, "coords": coords}
+        if with_classifier:
+            # on a pure segmentation step the quantum head is not in the path (Table 2)
+            logits, z = self.quantum_head(f_cls.float(), coords)
+            out.update(cls_logits=logits, z=z)
+        return out
 
     @torch.no_grad()
     def measure(self, label_maps: torch.Tensor):
@@ -184,8 +212,14 @@ class MQDANet(nn.Module):
         return self.qformer(vis, vis_mask, gtok, gmask, out["z"])
 
     # ------------------------------------------------------------------
-    def forward(self, images, seg_labels=None, reports=None, notes=None, with_report=None):
-        out = self.segment_and_classify(images)
+    def forward(self, images, seg_labels=None, reports=None, notes=None, with_report=None,
+                task=None):
+        """``task``: "cls" runs the 2D classification step (A_2D->3D + GAP +
+        quantum head), "seg" the segmentation step without the quantum head,
+        and None (default) the full volumetric path."""
+        if task == "cls":
+            return self.classify_2d(images)
+        out = self.segment_and_classify(images, with_classifier=task != "seg")
         with_report = (self.report is not None) if with_report is None else with_report
         if with_report and self.graph is not None and self.report is not None:
             measurements, gb, g = self.build_graph(out, seg_labels, notes)

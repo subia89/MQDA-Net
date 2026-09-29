@@ -39,6 +39,16 @@ images (5,618 train / 1,405 test) rather than the Training/Testing folders that
 ship with the dataset (5,712 / 1,311). The split indices are listed under
 `splits/`.
 
+## Training protocol (Table 2)
+
+Stage 1 alternates a segmentation step (4 BraTS volumes, L_seg) with a
+classification step (32 2D images, L_cls) over one shared MedNeXt-L encoder;
+the 2D cohort reaches that encoder through the parameter-free A_2D→3D
+adaptation and is pooled by global average pooling. Stage 2 freezes the
+encoder, MSASPP, DFCAM, decoder and quantum head and trains only the graph
+reasoner, the Q-Former and the LoRA adapters — `configs/stage1_alternating.yaml`
+and `train.freeze_vision: true` in `configs/brats2023_joint.yaml`.
+
 ## Changes in this release
 
 - Stage-1 epochs corrected from 300 to 200 in `configs/base.yaml`,
@@ -50,6 +60,12 @@ ship with the dataset (5,712 / 1,311). The split indices are listed under
 - The classification benchmark is named consistently as the Nickparvar
   composite; `configs/kaggle_7k.yaml` is renamed `configs/nickparvar.yaml`.
 - Removed a stale reference to an earlier draft of the manuscript.
+- Added the alternating two-cohort stage-1 loop, the A_2D→3D input adaptation
+  and the global-average-pooling classification path, so the code follows
+  Table 2 of the manuscript step by step; stage 2 now freezes the vision
+  modules.
+- Br35H is described as 3,000 slices (1,500 tumor / 1,500 tumor-free),
+  matching the revised manuscript.
 
 ## Not included
 

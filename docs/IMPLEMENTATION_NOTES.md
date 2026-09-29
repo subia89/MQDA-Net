@@ -97,9 +97,14 @@ This file lists every place where the paper leaves a detail open and the code ha
 
 ## Training (§3.7, Table 1)
 
-- **Stages.** Table 1 gives separate epochs, learning rates and batch sizes for "seg + cls" and "LLM", so training runs in two stages with the same model code:
-  1. `stage: vision` — L_seg + L_cls, 200 epochs, lr 1e-4, batch 4 (3D) / 32 (2D).
-  2. `stage: joint` — all four losses, 50 epochs, batch 8, lr 1e-4 for vision / graph / Q-Former and 2e-5 for LoRA and the alignment heads. Everything is trained end to end in this stage.
+- **Stages (Table 2).**
+  1. `configs/stage1_alternating.yaml` — 200 epochs, lr 1e-4. Each epoch runs both cohorts in alternating task-specific steps; the composite objective of Eq. 2 is never evaluated in full on one sample, only the term the step's annotations support:
+     - segmentation step: batch of 4 volumes, `λ₁·L_seg`, quantum head not in the path;
+     - classification step: batch of 32 images, `λ₂·L_cls`, decoder and DFCAM not in the path.
+     With 1,001 volumes and 5,618 images this gives 251 + 176 steps per epoch. `configs/brats2023_vision.yaml` still trains the segmentation cohort on its own.
+  2. `stage: joint` — 50 epochs, batch 8, lr 2e-5. With `train.freeze_vision: true` the encoder, MSASPP, DFCAM, decoder and quantum head are evaluated but not updated, so only the graph reasoner, the Q-Former and the LoRA adapters learn.
+- **A_2D→3D.** The classification cohort reaches the shared 3D encoder through a parameter-free adaptation (`mqda/data/adapt.py`): bilinear resize to 128 × 128, replication to depth 16, replication across the 4 sequence channels.
+- **Two pooling paths into the quantum head.** Volumetric samples use masked average pooling of F5′ plus radiomics; 2D samples have no mask, so they are pooled by global average pooling with no radiomics. To give both paths the same dimension, the pooled vector fills the three sub-region slots and the radiomic block is zero; the projection and the circuit that follow are identical. The spatial qubits receive zero coordinates for the 2D path, since no centroid is defined.
 - **Optimiser.** AdamW with weight decay 1e-5, gradient clipping at 1.0 and bf16. The cosine learning-rate schedule is not stated in the paper and can be turned off with `train.scheduler: none`.
 - **Early stopping.** Patience is 20 epochs. By default the monitored value is mean Dice + accuracy − 0.1·val L_txt.
 - **Cropping.** Training crops are centred on a random tumour voxel with probability 0.5, and on a random brain voxel otherwise. Evaluation uses a brain-centred crop, or sliding-window segmentation of the full volume (`--full-volume`, Gaussian weighting, 50 % overlap).
@@ -109,5 +114,6 @@ This file lists every place where the paper leaves a detail open and the code ha
 ## Not included
 
 - Trained weights, and the 150 clinician-annotated reports or the 50 curated DPO pairs used in the paper.
+- The 5,618 / 1,405 stratified split indices of the Nickparvar composite. `configs/nickparvar.yaml` falls back to the dataset's own Training/Testing folders (5,712 / 1,311), which is a different split.
 - The exact Vox-MMSD BraTS 2024 split list. Place it under `splits/` if you have it.
 - A skull-stripping tool. BraTS is already skull-stripped; for other data use e.g. HD-BET before `scripts/preprocess.py`.

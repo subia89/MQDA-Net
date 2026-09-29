@@ -6,4 +6,5 @@ output_dir: runs/smoke_test_joint
 train:
   stage: joint
   epochs: 1
+  freeze_vision: true
   init_from: runs/smoke_test/best.pt

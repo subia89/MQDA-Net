@@ -3,10 +3,10 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 .ruff_cache/
-runs/
-outputs/
-results/
-data/
+/runs/
+/outputs/
+/results/
+/data/
 *.pt
 *.pth
 *.ckpt

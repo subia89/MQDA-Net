@@ -65,7 +65,7 @@ The smoke tests only confirm that every component runs end to end. They say noth
 | **BraTS 2023 GLI** (1,251 volumes) | segmentation, reports | `data/BraTS2023-GLI/<...>/BraTS-GLI-XXXXX-XXX/BraTS-GLI-XXXXX-XXX-{t1n,t1c,t2w,t2f,seg}.nii.gz` |
 | **BraTS 2024 post-treatment** (271 volumes) | fine-tuning / transfer | same naming; label 4 (resection cavity) is mapped to background |
 | **FigShare** (3,064 T1-CE slices) | classification + 2D masks | `data/figshare/*.mat` (the original `cjdata` files) |
-| **Br35H** (3,959 slices) | classification, merged with FigShare | `data/Br35H/{yes,no}/*.jpg` |
+| **Br35H** (3,000 slices: 1,500 tumor, 1,500 tumor-free) | classification, contributes the no-tumor images | `data/Br35H/{yes,no}/*.jpg` |
 | **Nickparvar composite** (7,023 images, v1) | classification, primary benchmark | `data/nickparvar/{Training,Testing}/<class>/*.jpg` |
 | **SARTAJ (3K-DS)** (3,264 images) | classification, supplementary | `data/3K-DS/{Training,Testing}/<class>/*.jpg` |
 
@@ -98,13 +98,20 @@ The lookup table has one `id name` pair per line. The default `{type: coarse}` a
 
 ## Training
 
-Training runs in two stages that share one model. Table 1 of the paper gives different epochs, learning rates and batch sizes for the segmentation/classification part and for the language part:
+Training runs in two stages over one shared encoder (Table 2 of the paper).
+
+**Stage 1** presents the two cohorts in alternating task-specific steps: a segmentation step (4 BraTS volumes, `L_seg`, quantum head not in the path) and a classification step (32 2D images, `L_cls`, decoder and DFCAM not in the path). The 2D images reach the same 3D encoder through the parameter-free adaptation `A_2D→3D` — resize to 128 × 128, replicate to depth 16, replicate across the 4 sequence channels — and are pooled by global average pooling, since they carry no mask. Both step types update the shared encoder and MSASPP.
+
+**Stage 2** trains only the graph reasoner, the Q-Former and the LoRA adapters; the encoder, MSASPP, DFCAM, decoder and quantum head are evaluated but frozen (`train.freeze_vision: true`).
 
 ```bash
-# Stage 1 — encoder + dual-branch decoder + quantum head (L_seg + L_cls): 200 epochs, lr 1e-4, batch 4
+# Stage 1 — both cohorts, alternating steps: 200 epochs, lr 1e-4, batch 4 (3D) / 32 (2D)
+python scripts/train.py --config configs/stage1_alternating.yaml
+
+# Stage 1, segmentation cohort only (BraTS, no classification steps)
 python scripts/train.py --config configs/brats2023_vision.yaml
 
-# Stage 2 — all modules and all four losses: 50 epochs, lr 1e-4 (vision) / 2e-5 (LLM), batch 8,
+# Stage 2 — report components only (vision frozen): 50 epochs, lr 2e-5, batch 8,
 #           2 GPUs, bf16, DeepSpeed ZeRO-2
 accelerate launch --config_file configs/accelerate_zero2.yaml \
     scripts/train.py --config configs/brats2023_joint.yaml
@@ -112,7 +119,7 @@ accelerate launch --config_file configs/accelerate_zero2.yaml \
 # BraTS 2024 post-treatment fine-tuning (217 / 54)
 python scripts/train.py --config configs/brats2024_finetune.yaml
 
-# 2D classification benchmarks (224 × 224, batch 32)
+# 2D classification benchmarks on their own (2D model, 224 × 224, batch 32)
 python scripts/train.py --config configs/figshare_br35h.yaml
 python scripts/train.py --config configs/nickparvar.yaml
 python scripts/train.py --config configs/ds3k.yaml
@@ -128,6 +135,9 @@ Useful switches:
 - `model.q_backend`: `torch` uses the built-in exact state-vector simulator. `pennylane` runs the same circuit on `default.qubit`.
 - `llm.load_in_4bit: true` switches to QLoRA with a 4-bit frozen backbone.
 - `model.graph_from_ground_truth: true` builds training graphs from the ground-truth masks instead of the predictions.
+- `train.freeze_vision: true` freezes the encoder, MSASPP, DFCAM, decoder and quantum head (the report stage of Table 2).
+- `train.batch_size_2d` sets the classification-step batch size in the alternating stage-1 loop.
+- `model.adapt_size` / `model.adapt_depth` set the `A_2D→3D` resolution and pseudo-volume depth (128 / 16).
 
 ## Evaluation
 

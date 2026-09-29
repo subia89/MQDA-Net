@@ -8,6 +8,7 @@ train:
   stage: joint
   epochs: 50
   batch_size: 8
+  freeze_vision: true    # Table 2: encoder, MSASPP, DFCAM, decoder and quantum head frozen
   init_from: runs/brats2023_vision/best.pt
 data:
   type: brats

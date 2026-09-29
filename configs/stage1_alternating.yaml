@@ -1,0 +1,30 @@
+# Stage 1 exactly as Sec. 3.7 / Table 2 of the manuscript: one shared 3D encoder,
+# two cohorts presented in alternating task-specific steps.
+#   segmentation step — 4 BraTS volumes, L_seg, quantum head not in the path
+#   classification step — 32 2D images through A_2D->3D, L_cls, decoder not in the path
+# 1,001 volumes / 5,618 images give 251 + 176 steps per epoch.
+base: base.yaml
+experiment: stage1_alternating
+output_dir: runs/stage1_alternating
+train:
+  stage: vision
+  epochs: 200
+  batch_size: 4          # segmentation steps
+  batch_size_2d: 32      # classification steps
+data:
+  type: alternating
+  segmentation:
+    type: brats
+    root: data/BraTS2023-GLI/ASNR-MICCAI-BraTS2023-GLI-Challenge-TrainingData
+    naming: "2023"
+    train_split: splits/brats2023_train.txt
+    val_split: splits/brats2023_test.txt
+    size: [128, 128, 128]
+    class_name: glioma
+  classification:
+    type: folder
+    size: [224, 224]
+    folder:
+      train_root: data/nickparvar/Training
+      val_root: data/nickparvar/Testing
+      class_map: {glioma: 0, meningioma: 1, pituitary: 2, notumor: 3}
