@@ -25,6 +25,9 @@ data:
     type: folder
     size: [224, 224]
     folder:
-      train_root: data/nickparvar/Training
-      val_root: data/nickparvar/Testing
+      # image-level stratified 80/20 split of all 7,023 images (5,618 / 1,405),
+      # as in the manuscript (Table 3a); see splits/README.md
+      root: data/nickparvar
+      train_split: splits/nickparvar_train.txt
+      val_split: splits/nickparvar_test.txt
       class_map: {glioma: 0, meningioma: 1, pituitary: 2, notumor: 3}

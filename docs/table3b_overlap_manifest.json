@@ -8,16 +8,40 @@
  "test_byte_identical_to_train": 103,
  "test_pixel_identical_to_train": 216,
  "test_dhash0_match_in_train": 468,
- "expected_pixel_identical_random_8020": {
-  "mean": 126.265,
-  "min": 104,
-  "max": 154,
+ "expected_under_manuscript_split": {
   "n_test": 1405,
-  "resamples": 200
+  "per_class_test": {
+   "glioma": 324,
+   "meningioma": 329,
+   "notumor": 400,
+   "pituitary": 352
+  },
+  "resamples": 200,
+  "byte": {
+   "mean": 86.915,
+   "min": 68,
+   "max": 109
+  },
+  "pixel": {
+   "mean": 126.28,
+   "min": 104,
+   "max": 154
+  },
+  "dhash0": {
+   "mean": 355.75,
+   "min": 326,
+   "max": 392
+  }
  },
- "cross_class_false_match_pct": {
+ "actual_split": null,
+ "cross_class_false_match_pct_distributed_partition": {
   "0": 1.0683760683760684,
   "2": 22.446236559139784,
   "4": 48.83268482490272
+ },
+ "cross_class_false_match_pct_pooled": {
+  "0": 2.2564102564102564,
+  "2": 26.57843948166529,
+  "4": 53.927001719854765
  }
 }

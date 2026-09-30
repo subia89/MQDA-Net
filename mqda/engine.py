@@ -21,7 +21,7 @@ from .utils.checkpoint import load_checkpoint, save_checkpoint
 log = logging.getLogger("mqda")
 
 DEFAULT_TRAIN = {
-    "stage": "vision", "epochs": 300, "batch_size": 4, "lr": 1e-4, "llm_lr": 2e-5,
+    "stage": "vision", "epochs": 200, "batch_size": 4, "lr": 1e-4, "llm_lr": 2e-5,
     "weight_decay": 1e-5, "lambdas": [1.0, 0.5, 1.0, 0.1], "w_binary": 0.8,
     "w_semantic": 1.0, "focal_gamma": 2.0, "label_smoothing": 0.1, "patience": 20,
     "precision": "bf16", "grad_clip": 1.0, "grad_accum": 1, "scheduler": "cosine",
@@ -42,8 +42,21 @@ def freeze_vision_modules(model):
             frozen += p.numel()
     model.encoder.eval()
     model.decoder.eval()
+    model.quantum_head.eval()
+    model._frozen_vision = True
     log.info("froze %.2f M vision parameters for the report stage", frozen / 1e6)
     return frozen
+
+
+def set_train_mode(model):
+    """model.train() that keeps the frozen vision modules of the report stage in
+    eval mode, so their normalisation statistics are not updated either."""
+    model.train()
+    core = model.module if hasattr(model, "module") else model
+    if getattr(core, "_frozen_vision", False):
+        core.encoder.eval()
+        core.decoder.eval()
+        core.quantum_head.eval()
 
 
 def make_optimizer(model, tcfg):
@@ -100,7 +113,7 @@ def validate(model, loader, criterion, accelerator, class_names, with_report, ma
     if any(t >= 0 for t in y_true):
         cm = classification_metrics(y_true, y_pred, class_names)
         metrics.update({k: v for k, v in cm.items() if k != "confusion_matrix"})
-    model.train()
+    set_train_mode(model)
     return metrics
 
 
@@ -161,7 +174,7 @@ def train(cfg: dict, model, accelerator):
     history_path = os.path.join(out_dir, "history.jsonl")
     step = 0
     for epoch in range(start_epoch, tcfg["epochs"]):
-        model.train()
+        set_train_mode(model)
         t0 = time.time()
         running = defaultdict(float)
         n = 0
@@ -253,7 +266,7 @@ def validate_alternating(model, seg_dl, cls_dl, criterion, accelerator, class_na
     if any(t >= 0 for t in y_true):
         cm = classification_metrics(y_true, y_pred, class_names)
         metrics.update({k: v for k, v in cm.items() if k != "confusion_matrix"})
-    model.train()
+    set_train_mode(model)
     return metrics
 
 
@@ -271,9 +284,11 @@ def train_alternating(cfg, tcfg, model, accelerator):
                                     model.cfg)
     log.info("segmentation %d/%d, classification %d/%d samples",
              len(seg_tr), len(seg_va), len(cls_tr), len(cls_va))
+    # the last, smaller batch is kept, so an epoch has ceil(N / batch) steps of each
+    # type: 251 segmentation + 176 classification steps for 1,001 volumes / 5,618 images
     mk = lambda ds, bs, sh: DataLoader(  # noqa: E731
         ds, batch_size=bs, shuffle=sh, num_workers=tcfg["num_workers"], collate_fn=collate,
-        drop_last=sh and len(ds) > bs, pin_memory=torch.cuda.is_available())
+        drop_last=False, pin_memory=torch.cuda.is_available())
     seg_dl, cls_dl = mk(seg_tr, tcfg["batch_size"], True), mk(cls_tr, tcfg["batch_size_2d"], True)
     seg_vl, cls_vl = mk(seg_va, tcfg["batch_size"], False), mk(cls_va, tcfg["batch_size_2d"], False)
 
@@ -290,7 +305,7 @@ def train_alternating(cfg, tcfg, model, accelerator):
     best, bad_epochs, step = -float("inf"), 0, 0
     history_path = os.path.join(out_dir, "history.jsonl")
     for epoch in range(tcfg["epochs"]):
-        model.train()
+        set_train_mode(model)
         t0 = time.time()
         running, counts = defaultdict(float), defaultdict(int)
         seg_it, cls_it = iter(seg_dl), iter(cls_dl)

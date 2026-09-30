@@ -20,7 +20,12 @@ python scripts/make_splits.py --stratified-folder data/nickparvar \
 ```
 
 `configs/nickparvar.yaml` reads `splits/nickparvar_train.txt` and
-`splits/nickparvar_test.txt`.
+`splits/nickparvar_test.txt`. These two files are a reference split generated
+by that command with seed 42: the test size is ceil(0.2 N) = 1,405, allocated
+per class by largest remainder (324 glioma, 329 meningioma, 352 pituitary,
+400 no tumor), the sizes of the split reported in the manuscript. The lists
+used for the reported results were not retained, so image membership is not
+necessarily the same.
 
 For BraTS 2024 the paper follows the 217 / 54 split of Vox-MMSD; if you have
 that exact list, save it here as `brats2024_train.txt` / `brats2024_test.txt`

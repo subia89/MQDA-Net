@@ -6,7 +6,7 @@ train:
   stage: vision
   epochs: 200
   batch_size: 4
-  init_from: runs/brats2023_vision/best.pt
+  init_from: runs/stage1_alternating/best.pt   # Stage I weights (Table 2)
 data:
   type: brats
   root: data/BraTS2024-GLI-PostTreatment/training_data

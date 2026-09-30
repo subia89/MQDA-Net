@@ -30,7 +30,7 @@ More module figures: [dual-branch decoder](docs/figures/dual_branch_decoder.jpg)
 | Composite objective λ₁L_seg + λ₂L_cls + λ₃L_txt + λ₄L_align | §3.1, Eq. 2 | [`mqda/losses/total.py`](mqda/losses/total.py) |
 | Full model (Eq. 1) | §3.1 | [`mqda/models/mqda_net.py`](mqda/models/mqda_net.py) |
 | Metrics (Dice, IoU, HD95, ASSD, accuracy/P/R/F1, BLEU, ROUGE, METEOR, BERTScore, RadGraph-F1) | §4 | [`mqda/eval/metrics.py`](mqda/eval/metrics.py) |
-| Wilcoxon signed-rank test, BCa bootstrap CIs, rank-biserial correlation, Bonferroni correction | §5.1 | [`mqda/eval/stats.py`](mqda/eval/stats.py) |
+| BCa bootstrap intervals over per-case scores (descriptive; §5.1 of the paper reports no significance test). `scripts/significance.py` is retained as a tool and is not used for any value in the paper | §5.1 | [`mqda/eval/stats.py`](mqda/eval/stats.py) |
 
 Where the paper leaves a detail open, the choice made in the code is listed in [docs/IMPLEMENTATION_NOTES.md](docs/IMPLEMENTATION_NOTES.md).
 
@@ -148,8 +148,8 @@ Useful switches:
 ## Evaluation
 
 ```bash
-# segmentation + classification (per-case CSV for significance testing)
-python scripts/evaluate.py --checkpoint runs/brats2023_vision/best.pt --full-volume --out results/brats2023
+# segmentation + classification (per-case CSV for the bootstrap intervals)
+python scripts/evaluate.py --checkpoint runs/stage1_alternating/best.pt --full-volume --out results/brats2023
 python scripts/evaluate.py --checkpoint runs/figshare_br35h/best.pt --no-distances
 
 # report generation + BLEU / ROUGE / METEOR / BERTScore / RadGraph-F1
@@ -213,11 +213,11 @@ docs/               implementation notes, example knowledge-base file, figures
 RELEASE_NOTES.md    what each tagged release corresponds to in the manuscript
 ```
 
-## Version used for the reported results
+## Version cited by the manuscript
 
-The results in the manuscript (IJIES, paper ID 20265965) correspond to the tagged release **v1.0.0** — run `git rev-parse v1.0.0` for the exact commit, which is also shown on the release page. That tag, the configuration files, this README and `docs/IMPLEMENTATION_NOTES.md` describe one and the same protocol:
+The manuscript (IJIES, paper ID 20265965) cites the tagged release **v1.0.1** — run `git rev-parse v1.0.1` for the exact commit, which is also shown on the release page. That tag, the configuration files, this README and `docs/IMPLEMENTATION_NOTES.md` describe one and the same protocol, the one under which the reported results were obtained:
 
-| Manuscript | Release v1.0.0 |
+| Manuscript | Release v1.0.1 |
 |---|---|
 | Stage I: 200 epochs, lr 1e-4, batch 4 (3D) / 32 (2D) | `train.epochs: 200` in `configs/base.yaml`, `configs/stage1_alternating.yaml` |
 | Stage I: segmentation and classification steps alternate over one shared encoder; only the term the step's annotations support is active (Eq. 2, Table 2) | `configs/stage1_alternating.yaml`, `mqda/engine.py::train_alternating` |
@@ -225,12 +225,12 @@ The results in the manuscript (IJIES, paper ID 20265965) correspond to the tagge
 | Quantum simulator: PennyLane 0.35, `default.qubit` | `model.q_backend: pennylane` |
 | Classification benchmark: Nickparvar composite v1, 7,023 images, stratified 5,618 / 1,405 | `configs/nickparvar.yaml` with `splits/nickparvar_*.txt` |
 
-Releases before v1.0.0 predate the revised protocol and should not be used to reproduce the reported numbers. `RELEASE_NOTES.md` lists what changed.
+Earlier states of the repository, including the commit first tagged v1.0.0, did not implement Stage II as the manuscript describes it and should not be used to reproduce the reported numbers. `RELEASE_NOTES.md` lists what changed.
 
 ## Reproducibility
 
 - **Seeds.** Every config sets `seed: 42`, applied to Python, NumPy and PyTorch through Accelerate. Dataset splits are drawn with their own seed (`data.seed`), so they are reproducible independently of training.
-- **Splits.** `splits/nickparvar_train.txt` and `splits/nickparvar_test.txt` are the 5,618 / 1,405 stratified split used for the reported classification results, and `configs/nickparvar.yaml` reads them. They were produced with the command below (seed 42); the BraTS lists are generated the same way:
+- **Splits.** `splits/nickparvar_train.txt` and `splits/nickparvar_test.txt` are a **reference split** of the Nickparvar composite generated with the command below (seed 42). It has the sizes of the split reported in the manuscript — 5,618 / 1,405 images, with 324 glioma, 329 meningioma, 352 pituitary and 400 no-tumor test images, the row totals of the confusion matrix in Figure 6 — but the split lists of the reported experiment were not retained, so image membership is not necessarily the same. `configs/nickparvar.yaml` reads these files; the BraTS lists are generated the same way:
 
 ```bash
 # BraTS 2023: 1,001 / 250, and the 150-report evaluation subset
@@ -249,9 +249,9 @@ python scripts/make_splits.py --stratified-folder data/nickparvar \
 python scripts/overlap_analysis.py --root data/nickparvar
 ```
 
-On the Nickparvar composite v1 this prints 300 exact-pixel duplicate clusters over 726 images, none with conflicting labels, and 103 test images (7.86 %) byte-identical to a training image — the values reported in the manuscript. The full output is committed as [`docs/table3b_overlap_manifest.json`](docs/table3b_overlap_manifest.json).
+On the Nickparvar composite v1 this prints the values of Table 3b: 300 exact-pixel duplicate clusters over 726 images, none with conflicting labels, and — because the train–test overlap depends on the particular random draw of the split — the expected overlap under the manuscript's split protocol (mean over 200 random image-level stratified 80/20 draws, n = 1,405): 87 test images (6.19 %) byte-identical to a training image, 126 (8.97 %) pixel-identical and 356 (25.34 %) with a zero-distance perceptual-hash match, with a cross-class false-match rate of the perceptual hash over the pooled cohort of 2.3 % / 26.6 % / 53.9 % at distance 0 / 2 / 4. The partition as distributed with the dataset (5,712 / 1,311) is printed for reference. The full output is committed as [`docs/table3b_overlap_manifest.json`](docs/table3b_overlap_manifest.json); `--test-list <file>` reports the overlap of any given test partition.
 
-- **Trained weights**, the 150 clinician-annotated reports and the 50 curated DPO preference pairs are not distributed here; they are available from the corresponding author on reasonable request.
+- **Trained weights**, the 150 clinician-annotated reports and the 50 curated DPO preference pairs are not distributed here.
 
 ## Hardware
 

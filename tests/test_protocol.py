@@ -5,7 +5,7 @@ import torch
 
 from helpers import tiny_config, toy_report_generator
 from mqda.data.adapt import adapt_2d_to_3d
-from mqda.engine import freeze_vision_modules
+from mqda.engine import freeze_vision_modules, set_train_mode
 from mqda.losses.total import MQDALoss
 from mqda.models.mqda_net import MQDANet
 
@@ -55,3 +55,7 @@ def test_report_stage_freezes_the_vision_modules():
     assert any(n.startswith("graph.") for n in trainable)
     assert any(n.startswith("qformer.") for n in trainable)
     assert any("lora_" in n for n in trainable)
+    # the frozen modules stay in eval mode when training resumes (Table 2: evaluated, not updated)
+    set_train_mode(m)
+    assert m.training and m.graph.training and m.qformer.training
+    assert not m.encoder.training and not m.decoder.training and not m.quantum_head.training

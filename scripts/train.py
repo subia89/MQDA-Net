@@ -1,16 +1,20 @@
 #!/usr/bin/env python
 """Train MQDA-Net.
 
-Stage 1 (vision): encoder + dual-branch decoder + quantum head, L_seg + L_cls.
-Stage 2 (joint):  everything, including the knowledge graph, Q-Former and the
-                  LoRA-adapted language model, under the four-term objective.
+Stage 1 (vision, configs/stage1_alternating.yaml): encoder + dual-branch decoder
+                  + quantum head, alternating segmentation (L_seg) and
+                  classification (L_cls) steps over the shared encoder; 200 epochs.
+Stage 2 (joint, configs/brats2023_joint.yaml): encoder, MSASPP, DFCAM, decoder and
+                  quantum head frozen (train.freeze_vision: true); only the graph
+                  reasoner, the Q-Former projector and the LoRA adapters are trained,
+                  with L_txt + L_align (Table 2 of the manuscript); 50 epochs.
 
 Examples
 --------
-python scripts/train.py --config configs/brats2023_vision.yaml
+python scripts/train.py --config configs/stage1_alternating.yaml
 accelerate launch --config_file configs/accelerate_zero2.yaml \
     scripts/train.py --config configs/brats2023_joint.yaml \
-    train.init_from=runs/brats2023_vision/best.pt
+    train.init_from=runs/stage1_alternating/best.pt
 python scripts/train.py --config configs/smoke_test.yaml      # synthetic data, CPU
 """
 import argparse

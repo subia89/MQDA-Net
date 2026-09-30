@@ -1,4 +1,5 @@
-# Stage 2 on BraTS 2023: all four objectives, LoRA language model.
+# Stage 2 on BraTS 2023 (Table 2): encoder, MSASPP, DFCAM, decoder and quantum head frozen;
+# graph reasoner, Q-Former projector and LoRA adapters trained with L_txt + L_align.
 # accelerate launch --config_file configs/accelerate_zero2.yaml scripts/train.py \
 #     --config configs/brats2023_joint.yaml
 base: base.yaml
@@ -9,7 +10,7 @@ train:
   epochs: 50
   batch_size: 8
   freeze_vision: true    # Table 2: encoder, MSASPP, DFCAM, decoder and quantum head frozen
-  init_from: runs/brats2023_vision/best.pt
+  init_from: runs/stage1_alternating/best.pt   # Stage I weights (Table 2)
 data:
   type: brats
   root: data/BraTS2023-GLI/ASNR-MICCAI-BraTS2023-GLI-Challenge-TrainingData
