@@ -213,6 +213,20 @@ docs/               implementation notes, example knowledge-base file, figures
 RELEASE_NOTES.md    what each tagged release corresponds to in the manuscript
 ```
 
+## Version used for the reported results
+
+The results in the manuscript (IJIES, paper ID 20265965) correspond to the tagged release **v1.0.0** — run `git rev-parse v1.0.0` for the exact commit, which is also shown on the release page. That tag, the configuration files, this README and `docs/IMPLEMENTATION_NOTES.md` describe one and the same protocol:
+
+| Manuscript | Release v1.0.0 |
+|---|---|
+| Stage I: 200 epochs, lr 1e-4, batch 4 (3D) / 32 (2D) | `train.epochs: 200` in `configs/base.yaml`, `configs/stage1_alternating.yaml` |
+| Stage I: segmentation and classification steps alternate over one shared encoder; only the term the step's annotations support is active (Eq. 2, Table 2) | `configs/stage1_alternating.yaml`, `mqda/engine.py::train_alternating` |
+| Stage II: 50 epochs, lr 2e-5; encoder, MSASPP, DFCAM, decoder and quantum head **frozen**; only the graph reasoner, Q-Former and LoRA adapters updated with `L_txt + L_align` | `train.freeze_vision: true` in `configs/brats2023_joint.yaml`, `mqda/engine.py::freeze_vision_modules` |
+| Quantum simulator: PennyLane 0.35, `default.qubit` | `model.q_backend: pennylane` |
+| Classification benchmark: Nickparvar composite v1, 7,023 images, stratified 5,618 / 1,405 | `configs/nickparvar.yaml` with `splits/nickparvar_*.txt` |
+
+Releases before v1.0.0 predate the revised protocol and should not be used to reproduce the reported numbers. `RELEASE_NOTES.md` lists what changed.
+
 ## Reproducibility
 
 - **Seeds.** Every config sets `seed: 42`, applied to Python, NumPy and PyTorch through Accelerate. Dataset splits are drawn with their own seed (`data.seed`), so they are reproducible independently of training.
