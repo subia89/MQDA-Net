@@ -1,5 +1,7 @@
+# Versions the reported experiments were run with are pinned in comments;
+# the ranges below are what the code needs.
 # Core
-torch>=2.1
+torch>=2.1                 # experiments: 2.1.0, CUDA 12.1, bfloat16
 numpy>=1.24
 scipy>=1.11
 scikit-learn>=1.3
@@ -10,7 +12,7 @@ h5py>=3.9
 pillow>=10.0
 # Quantum head (paper: PennyLane 0.35, default.qubit). The built-in torch
 # simulator is used by default; PennyLane is needed for q_backend: pennylane.
-pennylane>=0.35
+pennylane>=0.35            # experiments: 0.35.0, default.qubit
 # Language stage
 transformers>=4.45
 peft>=0.12

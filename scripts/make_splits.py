@@ -19,6 +19,7 @@ draws a per-class 20 % test sample and writes paths relative to the root.
 """
 import argparse
 import glob
+import math
 import os
 import random
 
@@ -38,12 +39,23 @@ def stratified_folder_split(args):
     if not per_class:
         raise SystemExit(f"no images found under {root}")
     rng = random.Random(args.seed)
-    train, test = [], []
     frac = args.test_fraction if args.test_fraction is not None else 0.2
+    total = sum(len(v) for v in per_class.values())
+    # sklearn-style stratification: ceil(total * frac) test images, distributed
+    # across the classes in proportion to their size (largest remainder)
+    n_test_total = math.ceil(total * frac)
+    quota, remainder = {}, {}
+    for cls, files in per_class.items():
+        exact = len(files) * n_test_total / total
+        quota[cls] = int(exact)
+        remainder[cls] = exact - quota[cls]
+    for cls in sorted(remainder, key=lambda c: (-remainder[c], c))[:n_test_total - sum(quota.values())]:
+        quota[cls] += 1
+    train, test = [], []
     for cls, files in sorted(per_class.items()):
         files = sorted(files)
         rng.shuffle(files)
-        n_test = int(round(len(files) * frac))
+        n_test = quota[cls]
         test += files[:n_test]
         train += files[n_test:]
         print(f"{cls:<14}{len(files):>6}  -> train {len(files) - n_test}, test {n_test}")

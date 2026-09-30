@@ -230,7 +230,7 @@ Releases before v1.0.0 predate the revised protocol and should not be used to re
 ## Reproducibility
 
 - **Seeds.** Every config sets `seed: 42`, applied to Python, NumPy and PyTorch through Accelerate. Dataset splits are drawn with their own seed (`data.seed`), so they are reproducible independently of training.
-- **Splits.** Generate them once, then commit the lists:
+- **Splits.** `splits/nickparvar_train.txt` and `splits/nickparvar_test.txt` are the 5,618 / 1,405 stratified split used for the reported classification results, and `configs/nickparvar.yaml` reads them. They were produced with the command below (seed 42); the BraTS lists are generated the same way:
 
 ```bash
 # BraTS 2023: 1,001 / 250, and the 150-report evaluation subset
@@ -243,11 +243,13 @@ python scripts/make_splits.py --stratified-folder data/nickparvar \
     --test-fraction 0.2 --prefix splits/nickparvar
 ```
 
-- **Duplicate and overlap analysis.** The numbers in the manuscript's Table 3b come from:
+- **Duplicate and overlap analysis.** Table 3b of the manuscript is reproduced by:
 
 ```bash
 python scripts/overlap_analysis.py --root data/nickparvar
 ```
+
+On the Nickparvar composite v1 this prints 300 exact-pixel duplicate clusters over 726 images, none with conflicting labels, and 103 test images (7.86 %) byte-identical to a training image — the values reported in the manuscript. The full output is committed as [`docs/table3b_overlap_manifest.json`](docs/table3b_overlap_manifest.json).
 
 - **Trained weights**, the 150 clinician-annotated reports and the 50 curated DPO preference pairs are not distributed here; they are available from the corresponding author on reasonable request.
 
@@ -257,6 +259,10 @@ The paper's experiments ran on 2 × NVIDIA H100 80 GB GPUs with PyTorch 2.1, bf1
 
 - stage 1 with `train.batch_size=2 train.grad_accum=2`
 - stage 2 with `llm.load_in_4bit=true`
+
+## Licence
+
+MIT, see [LICENSE](LICENSE). The datasets keep their own licences and are not redistributed here.
 
 ## Citation
 

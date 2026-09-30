@@ -1,0 +1,23 @@
+{
+ "n_images": 7023,
+ "n_train": 5712,
+ "n_test": 1311,
+ "pixel_duplicate_clusters": 300,
+ "images_in_a_duplicate_cluster": 726,
+ "clusters_with_conflicting_labels": 0,
+ "test_byte_identical_to_train": 103,
+ "test_pixel_identical_to_train": 216,
+ "test_dhash0_match_in_train": 468,
+ "expected_pixel_identical_random_8020": {
+  "mean": 126.265,
+  "min": 104,
+  "max": 154,
+  "n_test": 1405,
+  "resamples": 200
+ },
+ "cross_class_false_match_pct": {
+  "0": 1.0683760683760684,
+  "2": 22.446236559139784,
+  "4": 48.83268482490272
+ }
+}

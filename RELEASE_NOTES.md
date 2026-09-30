@@ -36,8 +36,10 @@ explicitly when downloading.
 
 The manuscript reports an image-level stratified 80/20 split of the full 7,023
 images (5,618 train / 1,405 test) rather than the Training/Testing folders that
-ship with the dataset (5,712 / 1,311). The split indices are listed under
-`splits/`.
+ship with the dataset (5,712 / 1,311). Those lists are committed as
+`splits/nickparvar_train.txt` and `splits/nickparvar_test.txt`, and
+`scripts/overlap_analysis.py` reproduces Table 3b on the same cohort
+(`docs/table3b_overlap_manifest.json`).
 
 ## Training protocol (Table 2)
 
